@@ -33,8 +33,23 @@ class SnakeGame {
     // Function to start the game
     startGame() {
         this.initGame();
-        this.gameLoop = setInterval(() => this.updateGame(), 100);
+        this.isRunning = true;
+        this.gameSpeed = 100;
+        this.gameLoop = setInterval(() => {
+            if (this.isRunning) {
+                this.updateGame();
+            }
+        }, this.gameSpeed);
         this.scheduleYellowApple();
+    }
+
+    // Enhanced pause/resume functionality
+    pauseGame() {
+        this.isRunning = false;
+    }
+
+    resumeGame() {
+        this.isRunning = true;
     }
 
     // Function to initialize the game
@@ -140,9 +155,23 @@ class SnakeGame {
     drawGame() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // Draw the snake
+        // Save context state for consistent rendering
+        this.ctx.save();
+
+        // Draw the snake with enhanced visibility
+        this.drawSnakeSegments();
+
+        // Restore context state
+        this.ctx.restore();
+
+        // Draw enhanced apples
+        this.drawApples();
+    }
+
+    // Enhanced snake drawing method
+    drawSnakeSegments() {
         // Handle color variations
-        let getColor = (i) => {
+        const getColor = (i) => {
             if (this.snakeColor === 'rainbow') {
                 const colors = ['#ff0000', '#ff9900', '#ffee00', '#33ff00', '#00ffee', '#0066ff', '#cc00ff'];
                 return colors[i % colors.length];
@@ -160,63 +189,98 @@ class SnakeGame {
             }
         };
 
-        this.ctx.shadowBlur = (this.snakePattern === 'glow') ? 25 : 10;
-        this.ctx.shadowColor = this.snakeColor === 'rainbow' ? '#fff' : this.snakeColor;
+        // Set shadow for glow effect
+        this.ctx.shadowBlur = (this.snakePattern === 'glow') ? 20 : 8;
+        this.ctx.shadowColor = this.snakeColor === 'rainbow' ? '#ffffff' : this.snakeColor;
 
         for (let i = 0; i < this.snake.length; i++) {
-            let part = this.snake[i];
-            let color = getColor(i);
+            const part = this.snake[i];
+            const color = getColor(i);
 
-            if (this.snakePattern === 'solid') {
-                this.ctx.fillStyle = color;
-                this.ctx.fillRect(part.x, part.y, this.boxSize, this.boxSize);
-            } else if (this.snakePattern === 'striped') {
-                this.ctx.fillStyle = (i % 2 === 0) ? color : '#222';
-                this.ctx.fillRect(part.x, part.y, this.boxSize, this.boxSize);
-            } else if (this.snakePattern === 'dotted') {
-                this.ctx.beginPath();
-                this.ctx.arc(part.x + this.boxSize / 2, part.y + this.boxSize / 2, this.boxSize / 2, 0, 2 * Math.PI);
-                this.ctx.fillStyle = (i % 2 === 0) ? color : '#fff';
-                this.ctx.fill();
-            } else if (this.snakePattern === 'gradient') {
-                let grad = this.ctx.createLinearGradient(part.x, part.y, part.x + this.boxSize, part.y + this.boxSize);
-                grad.addColorStop(0, color);
-                grad.addColorStop(1, "#fff");
-                this.ctx.fillStyle = grad;
-                this.ctx.fillRect(part.x, part.y, this.boxSize, this.boxSize);
-            } else if (this.snakePattern === 'outline') {
-                this.ctx.strokeStyle = color;
-                this.ctx.lineWidth = 3;
-                this.ctx.strokeRect(part.x + 2, part.y + 2, this.boxSize - 4, this.boxSize - 4);
-            } else if (this.snakePattern === 'glow') {
-                this.ctx.fillStyle = color;
-                this.ctx.fillRect(part.x, part.y, this.boxSize, this.boxSize);
-            } else if (this.snakePattern === 'checker') {
-                this.ctx.fillStyle = ((i + Math.floor(part.x / this.boxSize) + Math.floor(part.y / this.boxSize)) % 2 === 0) ? color : '#fff';
-                this.ctx.fillRect(part.x, part.y, this.boxSize, this.boxSize);
-            }
+            // Always draw solid base for visibility
+            this.ctx.fillStyle = color;
+            this.ctx.fillRect(part.x, part.y, this.boxSize, this.boxSize);
+
+            // Apply pattern overlay
+            this.applyPattern(part.x, part.y, color, i, part);
         }
-        this.ctx.shadowBlur = 0;
 
-        // Draw the apples
-        this.ctx.fillStyle = 'red';
-        this.ctx.shadowBlur = 15;
-        this.ctx.shadowColor = 'red';
+        // Reset shadow
+        this.ctx.shadowBlur = 0;
+        this.ctx.shadowColor = 'transparent';
+    }
+
+    // Apply pattern with guaranteed visibility
+    applyPattern(x, y, baseColor, segmentIndex, part) {
+        switch (this.snakePattern) {
+            case 'striped':
+                if (segmentIndex % 2 !== 0) {
+                    this.ctx.fillStyle = '#444444'; // Visible darker stripe
+                    this.ctx.fillRect(x, y, this.boxSize, this.boxSize);
+                }
+                break;
+
+            case 'dotted':
+                this.ctx.beginPath();
+                this.ctx.arc(x + this.boxSize / 2, y + this.boxSize / 2, this.boxSize / 3, 0, 2 * Math.PI);
+                this.ctx.fillStyle = segmentIndex % 2 === 0 ? '#ffffff' : baseColor;
+                this.ctx.fill();
+                break;
+
+            case 'gradient':
+                const grad = this.ctx.createLinearGradient(x, y, x + this.boxSize, y + this.boxSize);
+                grad.addColorStop(0, baseColor);
+                grad.addColorStop(1, '#ffffff');
+                this.ctx.fillStyle = grad;
+                this.ctx.globalAlpha = 0.8;
+                this.ctx.fillRect(x, y, this.boxSize, this.boxSize);
+                this.ctx.globalAlpha = 1.0;
+                break;
+
+            case 'outline':
+                // Enhanced outline with visible fill
+                this.ctx.strokeStyle = '#ffffff';
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeRect(x + 1, y + 1, this.boxSize - 2, this.boxSize - 2);
+                break;
+
+            case 'checker':
+                const isChecked = (segmentIndex + Math.floor(part.x / this.boxSize) + Math.floor(part.y / this.boxSize)) % 2 === 0;
+                if (!isChecked) {
+                    this.ctx.fillStyle = '#cccccc';
+                    this.ctx.fillRect(x, y, this.boxSize, this.boxSize);
+                }
+                break;
+
+            case 'glow':
+            case 'solid':
+            default:
+                // Already drawn solid base
+                break;
+        }
+    }
+
+    // Enhanced apple drawing
+    drawApples() {
+        // Draw regular apple
+        this.ctx.fillStyle = '#ff0044';
+        this.ctx.shadowBlur = 12;
+        this.ctx.shadowColor = '#ff0044';
         this.ctx.fillRect(this.apple.x, this.apple.y, this.boxSize, this.boxSize);
-        
-        // Draw special apple (cyan)
+
+        // Draw special apple (blue)
         if (this.specialApple) {
-            this.ctx.fillStyle = 'cyan';
-            this.ctx.shadowBlur = 20;
-            this.ctx.shadowColor = 'cyan';
+            this.ctx.fillStyle = '#0088ff';
+            this.ctx.shadowBlur = 15;
+            this.ctx.shadowColor = '#0088ff';
             this.ctx.fillRect(this.specialApple.x, this.specialApple.y, this.boxSize, this.boxSize);
         }
 
         // Draw yellow apple (5 points)
         if (this.yellowApple) {
-            this.ctx.fillStyle = 'yellow';
-            this.ctx.shadowBlur = 20;
-            this.ctx.shadowColor = 'yellow';
+            this.ctx.fillStyle = '#ffdd00';
+            this.ctx.shadowBlur = 15;
+            this.ctx.shadowColor = '#ffdd00';
             this.ctx.fillRect(this.yellowApple.x, this.yellowApple.y, this.boxSize, this.boxSize);
         }
 
@@ -278,30 +342,57 @@ class SnakeGame {
         }
     }
 
-    // Function to display the game over popup
+    // Enhanced endGame function with proper cleanup
     endGame() {
-        clearInterval(this.gameLoop);
+        this.isRunning = false;
+        
+        // Clear all intervals and timeouts
+        if (this.gameLoop) clearInterval(this.gameLoop);
+        if (this.renderLoop) cancelAnimationFrame(this.renderLoop);
         if (this.yellowAppleTimer) clearTimeout(this.yellowAppleTimer);
         if (this._specialAppleTimeout) clearTimeout(this._specialAppleTimeout);
         if (this._yellowAppleTimeout) clearTimeout(this._yellowAppleTimeout);
-        // Submit score to PHP
+        
+        // Submit score to PHP with error handling
         fetch('submit_score.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username: this.username, score: this.score })
-        }).then(() => {
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(() => {
+            if (typeof showGameOver === 'function') {
+                showGameOver(this.score);
+            }
+        })
+        .catch(error => {
+            console.warn('Failed to submit score:', error);
+            // Still show game over even if score submission fails
             if (typeof showGameOver === 'function') {
                 showGameOver(this.score);
             }
         });
     }
 
-    // Function to reset the game
+    // Enhanced resetGame function
     resetGame() {
-        this.initGame();
-        this.gameLoop = setInterval(() => this.updateGame(), 100);
+        this.isRunning = false;
+        
+        // Clear all timers
+        if (this.gameLoop) clearInterval(this.gameLoop);
+        if (this.renderLoop) cancelAnimationFrame(this.renderLoop);
+        if (this.yellowAppleTimer) clearTimeout(this.yellowAppleTimer);
         if (this._specialAppleTimeout) clearTimeout(this._specialAppleTimeout);
         if (this._yellowAppleTimeout) clearTimeout(this._yellowAppleTimeout);
+        
+        // Reset and restart game
+        this.initGame();
+        this.startGame();
     }
 
     // Function to update the score on screen
